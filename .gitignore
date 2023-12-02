@@ -1,0 +1,6 @@
+*.out
+*.ipc
+
+# nix
+result
+.direnv
