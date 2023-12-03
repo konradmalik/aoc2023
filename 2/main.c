@@ -12,8 +12,6 @@
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #endif
 
-const int rgb[3] = {12, 13, 14};
-
 char *ltrim(char *s) {
   while (isspace(*s))
     s++;
@@ -30,48 +28,39 @@ char *rtrim(char *s) {
 
 char *trim(char *s) { return rtrim(ltrim(s)); }
 
-// true if ok
-int process_color(char *color) {
+void process_color(char *color, int *rgb) {
   printf("color: %s\n", color);
 
   if (strstr(color, "red")) {
     int v;
     sscanf(color, "%d", &v);
     printf("got red %d\n", v);
-    if (v > rgb[0])
-      return 0;
+    rgb[0] = max(rgb[0], v);
   } else if (strstr(color, "green")) {
     int v;
     sscanf(color, "%d", &v);
     printf("got green %d\n", v);
-    if (v > rgb[1])
-      return 0;
+    rgb[1] = max(rgb[1], v);
   } else if (strstr(color, "blue")) {
     int v;
     sscanf(color, "%d", &v);
     printf("got blue %d\n", v);
-    if (v > rgb[2])
-      return 0;
+    rgb[2] = max(rgb[2], v);
   }
-  return 1;
 }
 
-// true if ok
-int process_token(char *token) {
+void process_token(char *token, int *rgb) {
   printf("token: %s\n", token);
 
   char *end_str;
   char *color = strtok_r(token, ",", &end_str);
   while (color != NULL) {
-    int ok = process_color(trim(color));
-    if (ok == 0)
-      return 0;
+    process_color(trim(color), rgb);
     color = strtok_r(NULL, ",", &end_str);
   }
-  return 1;
 }
 
-int parse_line(char *line) {
+void parse_line(char *line, int *rgb) {
   printf("parsing: %s", line);
   line = strstr(line, ":") + 2;
   printf("skipped: %s", line);
@@ -79,13 +68,9 @@ int parse_line(char *line) {
   char *end_str;
   char *token = strtok_r(line, ";", &end_str);
   while (token != NULL) {
-    int ok = process_token(trim(token));
-    if (ok == 0)
-      return 0;
+    process_token(trim(token), rgb);
     token = strtok_r(NULL, ";", &end_str);
   }
-
-  return 1;
 }
 
 int main(void) {
@@ -101,13 +86,14 @@ int main(void) {
   unsigned sum = 0;
   while ((read = getline(&line, &len, fp)) != -1) {
     id++;
-    int ok = parse_line(line);
-    if (ok > 0) {
-      printf("id %d was ok\n\n", id);
-      sum += id;
-    } else {
-      printf("id %d was not ok\n\n", id);
-    }
+
+    int rgb[3] = {0, 0, 0};
+    parse_line(line, rgb);
+    printf("line rgb: %d, %d, %d\n", rgb[0], rgb[1], rgb[2]);
+    int power = rgb[0] * rgb[1] * rgb[2];
+    printf("line power: %d\n", power);
+    printf("\n");
+    sum += power;
   }
 
   printf("sum of ids is: %d\n", sum);
