@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #define ELEMS 100
+#define CARDS 500
 
 void parse_card(char *card, int *result) {
 
@@ -12,7 +13,6 @@ void parse_card(char *card, int *result) {
   char *snum = strtok_r(card, " ", &end_str);
   while (snum != NULL) {
     int num = atoi(snum);
-    printf("num: %d\n", num);
     result[i] = num;
     snum = strtok_r(NULL, " ", &end_str);
     i++;
@@ -20,10 +20,9 @@ void parse_card(char *card, int *result) {
 }
 
 int parse_line(char *line) {
-  int line_score = 0;
+  int matches = 0;
   printf("parsing: %s", line);
   line = strstr(line, ":") + 1;
-  printf("skipped: %s", line);
 
   char *end_str;
   char *winning = trim(strtok_r(line, "|", &end_str));
@@ -44,22 +43,18 @@ int parse_line(char *line) {
     if (anum == -1)
       break;
 
-    printf("compare %d\n", anum);
     for (int j = 0; j < ELEMS; j++) {
       int wnum = winnum[j];
       if (wnum == -1)
         break;
 
       if (wnum == anum) {
-        if (line_score == 0)
-          line_score = 1;
-        else
-          line_score *= 2;
+        matches++;
       }
     }
   }
 
-  return line_score;
+  return matches;
 }
 
 int main(void) {
@@ -71,15 +66,29 @@ int main(void) {
   if (fp == NULL)
     exit(EXIT_FAILURE);
 
+  int line_x[CARDS];
+  memset(line_x, 0, sizeof(line_x));
+
+  int card = 0;
   unsigned sum = 0;
   while ((read = getline(&line, &len, fp)) != -1) {
-    int line_score = parse_line(line);
-    printf("line score: %d\n", line_score);
+    line_x[card] += 1;
+    int matches = parse_line(line);
+    printf("line matches: %d\n", matches);
     printf("\n");
-    sum += line_score;
+
+    for (int m = 1; m <= matches; m++) {
+      line_x[card + m] += line_x[card];
+    }
+    card++;
   }
 
-  printf("sum of scores is: %d\n", sum);
+  for (int i = 0; i < card; i++) {
+    printf("card %d has %d copies\n", i + 1, line_x[i]);
+    sum += line_x[i];
+  }
+
+  printf("sum of cards is: %d\n", sum);
 
   fclose(fp);
   if (line)
