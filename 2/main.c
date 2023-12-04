@@ -1,32 +1,10 @@
+#include "../lib/minmax.c"
+#include "../lib/trim.c"
 #include <ctype.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#ifndef max
-#define max(a, b) (((a) > (b)) ? (a) : (b))
-#endif
-
-#ifndef min
-#define min(a, b) (((a) < (b)) ? (a) : (b))
-#endif
-
-char *ltrim(char *s) {
-  while (isspace(*s))
-    s++;
-  return s;
-}
-
-char *rtrim(char *s) {
-  char *back = s + strlen(s);
-  while (isspace(*--back))
-    ;
-  *(back + 1) = '\0';
-  return s;
-}
-
-char *trim(char *s) { return rtrim(ltrim(s)); }
 
 void process_color(char *color, int *rgb) {
   printf("color: %s\n", color);
