@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"log"
+	"math"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 )
@@ -106,19 +106,26 @@ func main() {
 		}
 	}
 
-	locations := make([]int, len(seeds))
-	for i, seed := range seeds {
-		// fmt.Println("for seed:", seed)
-		value := seed
-		for _, m := range maps {
-			value = m.lookup(value)
-			// fmt.Printf("for %s value is %d\n", m.name, value)
+	min_location := math.MaxInt
+	for s := 0; s < len(seeds); s += 2 {
+		smin := seeds[s]
+		slen := seeds[s+1]
+		fmt.Printf("seed %d out of %d\n", s, len(seeds))
+
+		for seed := smin; seed < (smin + slen); seed += 1 {
+			// fmt.Println("for seed:", seed)
+			value := seed
+			for _, m := range maps {
+				value = m.lookup(value)
+				// fmt.Printf("for %s value is %d\n", m.name, value)
+			}
+			if value < min_location {
+				min_location = value
+			}
 		}
-		locations[i] = value
 	}
 
-	fmt.Println("locations", locations)
-	fmt.Println("min", slices.Min(locations))
+	fmt.Println("min", min_location)
 
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
