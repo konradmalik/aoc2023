@@ -41,6 +41,9 @@ func main() {
 	distances := make([]int, 0, 4)
 	for scanner.Scan() {
 		line := scanner.Text()
+		// kerning fix
+		line = strings.ReplaceAll(line, " ", "")
+
 		if nline == 0 {
 			times = lib.ParseNumbers(strings.Split(line, ":")[1])
 		}
