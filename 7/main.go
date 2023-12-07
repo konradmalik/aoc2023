@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var cards = []rune{'A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'}
+var cards = []rune{'A', 'K', 'Q', 'T', '9', '8', '7', '6', '5', '4', '3', '2', 'J'}
 
 type hand struct {
 	text  string
@@ -31,7 +31,37 @@ const (
 	High
 )
 
+func sortHands(hands []hand) {
+	sort.Slice(hands, func(i, j int) bool {
+		h1 := hands[i]
+		h2 := hands[j]
+		cmp := compareHands(h1, h2)
+		// h2 is stronger, so h1 is "less"
+		return cmp == 1
+	})
+}
+
 func (h hand) classify() handtype {
+	if slices.Contains(h.cards[:], 'J') {
+		swaps := cards[:len(cards)-1]
+		newhands := make([]hand, len(swaps))
+		for i, swap := range swaps {
+			// laaazy but... ¯\_(ツ)_/¯
+			line := fmt.Sprintf("%s %d", h.text, h.bid)
+			line = strings.ReplaceAll(line, "J", string(swap))
+			newhand := parseLine(line)
+			newhands[i] = newhand
+		}
+
+		sortHands(newhands)
+		bestHand := newhands[len(newhands)-1]
+		return classifyClassic(bestHand)
+	}
+
+	return classifyClassic(h)
+}
+
+func classifyClassic(h hand) handtype {
 	cards := make(map[rune]int)
 	for _, c := range h.cards {
 		count := cards[c]
@@ -122,14 +152,7 @@ func main() {
 		hands = append(hands, hnd)
 	}
 
-	sort.Slice(hands, func(i, j int) bool {
-		h1 := hands[i]
-		h2 := hands[j]
-		cmp := compareHands(h1, h2)
-		// h2 is stronger, so h1 is "less"
-		return cmp == 1
-	})
-
+	sortHands(hands)
 	fmt.Println(hands)
 
 	winnings := 0
