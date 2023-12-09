@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 
 	"github.com/konradmalik/aoc2023/lib"
 )
 
 func processLine(line string) int {
 	numbers := lib.ParseNumbers(line)
+	// to predict the preceding one, just reverse
+	slices.Reverse(numbers)
 	diffs := recDiff(numbers)
 
 	data := append([][]int{numbers}, diffs...)
