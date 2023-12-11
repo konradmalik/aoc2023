@@ -10,10 +10,6 @@ func Distances(cs [][]Galaxy) []int {
 	return dists
 }
 
-func taxicabDistance(p1 Position, p2 Position) int {
-	return int(math.Abs(float64(p1.X)-float64(p2.X)) + math.Abs(float64(p1.Y)-float64(p2.Y)))
-}
-
 func Combinations(gs []Galaxy) [][]Galaxy {
 	cs := make([][]Galaxy, 0)
 	for i := 0; i < len(gs); i++ {
@@ -22,4 +18,8 @@ func Combinations(gs []Galaxy) [][]Galaxy {
 		}
 	}
 	return cs
+}
+
+func taxicabDistance(p1 Position, p2 Position) int {
+	return int(math.Abs(float64(p1.X)-float64(p2.X)) + math.Abs(float64(p1.Y)-float64(p2.Y)))
 }

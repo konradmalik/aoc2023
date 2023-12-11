@@ -5,10 +5,32 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"slices"
 
 	"golang.org/x/exp/maps"
 )
+
+type Galaxy struct {
+	Label    string
+	Position Position
+}
+
+type Universe struct {
+	galaxies map[string]Galaxy
+}
+
+func (g Galaxy) String() string {
+	return fmt.Sprintf("%s(%d,%d)", g.Label, g.Position.X, g.Position.Y)
+}
+
+func (g Galaxy) moveX(x int) Galaxy {
+	g.Position = Position{X: x, Y: g.Position.Y}
+	return g
+}
+
+func (g Galaxy) moveY(y int) Galaxy {
+	g.Position = Position{X: g.Position.X, Y: y}
+	return g
+}
 
 func NewUniverseFromFile(filepath string) Universe {
 	file, err := os.Open(filepath)
@@ -43,10 +65,6 @@ func (u *Universe) parseInc(line string, linenr int) {
 	}
 }
 
-type Universe struct {
-	galaxies map[string]Galaxy
-}
-
 func NewUniverse() Universe {
 	return Universe{make(map[string]Galaxy)}
 }
@@ -55,20 +73,10 @@ func (u Universe) Galaxies() []Galaxy {
 	return maps.Values(u.galaxies)
 }
 
-func (u Universe) galaxiesAfterX(x int) []Galaxy {
+func (u Universe) galaxiesAfter(cond func(Galaxy) bool) []Galaxy {
 	gs := make([]Galaxy, 0)
 	for _, g := range u.galaxies {
-		if g.Position.X > x {
-			gs = append(gs, g)
-		}
-	}
-	return gs
-}
-
-func (u Universe) galaxiesAfterY(y int) []Galaxy {
-	gs := make([]Galaxy, 0)
-	for _, g := range u.galaxies {
-		if g.Position.Y > y {
+		if cond(g) {
 			gs = append(gs, g)
 		}
 	}
@@ -76,18 +84,22 @@ func (u Universe) galaxiesAfterY(y int) []Galaxy {
 }
 
 func (u Universe) Expand(times int) {
-	u.expandX(times - 1)
-	u.expandY(times - 1)
+	u.expand(times-1, func(g Galaxy) int { return g.Position.X }, func(g Galaxy, i int) Galaxy { return g.moveX(i) })
+	u.expand(times-1, func(g Galaxy) int { return g.Position.Y }, func(g Galaxy, i int) Galaxy { return g.moveY(i) })
 }
 
-func (u Universe) expandX(extra int) {
+func (u Universe) expand(extra int, getIndex func(Galaxy) int, move func(Galaxy, int) Galaxy) {
 	x := 0
 	for {
+		maxx := 0
 		xsWithGalaxies := make(map[int]bool)
 		for _, g := range u.galaxies {
-			xsWithGalaxies[g.Position.X] = true
+			i := getIndex(g)
+			xsWithGalaxies[i] = true
+			if i > maxx {
+				maxx = i
+			}
 		}
-		maxx := slices.Max(maps.Keys(xsWithGalaxies))
 
 		if x >= maxx {
 			return
@@ -100,60 +112,12 @@ func (u Universe) expandX(extra int) {
 				continue
 			}
 
-			for _, g := range u.galaxiesAfterX(x) {
-				g.moveX(g.Position.X + extra)
-				u.galaxies[g.Label] = g
+			for _, g := range u.galaxiesAfter(func(g Galaxy) bool { return getIndex(g) > x }) {
+				u.galaxies[g.Label] = move(g, getIndex(g)+extra)
 			}
 
 			x = x + 1 + extra
 			break
 		}
 	}
-}
-
-func (u Universe) expandY(extra int) {
-	y := 0
-	for {
-		ysWithGalaxies := make(map[int]bool)
-		for _, g := range u.galaxies {
-			ysWithGalaxies[g.Position.Y] = true
-		}
-		maxy := slices.Max(maps.Keys(ysWithGalaxies))
-		if y >= maxy {
-			return
-		}
-
-		for y < maxy {
-			_, found := ysWithGalaxies[y]
-			if found {
-				y++
-				continue
-			}
-
-			for _, g := range u.galaxiesAfterY(y) {
-				g.moveY(g.Position.Y + extra)
-				u.galaxies[g.Label] = g
-			}
-
-			y = y + 1 + extra
-			break
-		}
-	}
-}
-
-type Galaxy struct {
-	Label    string
-	Position Position
-}
-
-func (g Galaxy) String() string {
-	return fmt.Sprintf("%s(%d,%d)", g.Label, g.Position.X, g.Position.Y)
-}
-
-func (g *Galaxy) moveX(x int) {
-	g.Position = Position{X: x, Y: g.Position.Y}
-}
-
-func (g *Galaxy) moveY(y int) {
-	g.Position = Position{X: g.Position.X, Y: y}
 }

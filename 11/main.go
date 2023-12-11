@@ -10,7 +10,7 @@ func main() {
 	fmt.Println("Original Galaxies:")
 	galaxies := u.Galaxies()
 	fmt.Println(galaxies)
-	u.Expand(2)
+	u.Expand(1_000_000)
 
 	fmt.Println("Expanded Galaxies:")
 	galaxies = u.Galaxies()
