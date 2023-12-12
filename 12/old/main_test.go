@@ -1,4 +1,4 @@
-package main
+package old
 
 import (
 	"strconv"
@@ -17,7 +17,11 @@ func TestProduct(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			actual := Product(tt.n)
+			c := Product(tt.n)
+			actual := make([]string, 0)
+			for s := range c {
+				actual = append(actual, s)
+			}
 			if !sameStringSlice(actual, tt.expected) {
 				t.Errorf("product: got %v, want %v", actual, tt.expected)
 			}
@@ -89,7 +93,7 @@ func TestArrangements(t *testing.T) {
 		fname            string
 		wantArrangements int
 	}{
-		{"./cases/case1.txt", 21},
+		{"./cases/case1.txt", 525152},
 	}
 
 	for _, tt := range tests {

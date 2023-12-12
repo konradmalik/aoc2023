@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/konradmalik/aoc2023/lib"
@@ -15,135 +16,98 @@ type Entry struct {
 	validation []int
 }
 
-func (e Entry) IsValid() bool {
-	if strings.Contains(e.history, "?") {
-		panic("questionmark should not be validated")
-	}
-
-	i := 0
-	vidx := 0
-	for i < len(e.history) {
-		if e.history[i] == '.' {
-			i++
-			continue
-		}
-
-		// hash after we met all validations is invalid
-		if vidx >= len(e.validation) {
-			return false
-		}
-
-		phist := e.history[i:]
-		validation := e.validation[vidx]
-		if !HasConsecutiveExactly(phist, validation) {
-			return false
-		}
-
-		i += validation
-		vidx++
-	}
-
-	// not all found, it's invalid
-	if vidx != len(e.validation) {
-		return false
-	}
-
-	return true
+func cacheKey(history []rune, validations []int) string {
+	return string(history) + strings.Trim(strings.Join(strings.Fields(fmt.Sprint(validations)), ","), "[]")
 }
 
-func (e Entry) FindQMarks() []int {
-	q := make([]int, 0)
-	for i, r := range e.history {
-		if r == '?' {
-			q = append(q, i)
+var cache = make(map[string]uint64)
+
+func Arrangements(history []rune, validations []int) uint64 {
+	ck := cacheKey(history, validations)
+	cached, found := cache[ck]
+	if found {
+		return cached
+	}
+
+	if len(history) == 0 {
+		if len(validations) == 0 {
+			cache[ck] = 1
+			return 1
 		}
-	}
-	return q
-}
-
-func GenerateFrom(e Entry) []Entry {
-	required := 0
-	for _, v := range e.validation {
-		required += v
-	}
-	current := strings.Count(e.history, "#")
-	left := required - current
-	if left < 0 {
-		panic("left is negative")
+		cache[ck] = 0
+		return 0
 	}
 
-	qmarks := e.FindQMarks()
-	if left > len(qmarks) {
-		panic("more left than qmarks")
-	}
-
-	generated := make([]Entry, 0)
-	products := Product(len(qmarks))
-	for _, p := range products {
-		ne := e
-		for pi, qi := range qmarks {
-			ne.history = replaceAtIndex(ne.history, rune(p[pi]), qi)
-		}
-		if ne.IsValid() {
-			generated = append(generated, ne)
-		}
-	}
-
-	return generated
-}
-
-func Product(slots int) []string {
-	res := make(map[string]bool)
-	current := make([]rune, 0)
-	res = product(slots, current, res)
-
-	words := make([]string, 0)
-	for w := range res {
-		words = append(words, w)
-	}
-	return words
-}
-
-func product(slots int, current []rune, res map[string]bool) map[string]bool {
-	runes := []rune{'.', '#'}
-
-	if slots == 0 {
-		res[string(current)] = true
+	if history[0] == '.' {
+		res := Arrangements(history[1:], validations)
+		cache[ck] = res
 		return res
 	}
 
-	for _, r := range runes {
-		next := append(current, r)
-		res = product(slots-1, next, res)
+	if history[0] == '?' {
+		res := Arrangements(append([]rune{'.'}, history[1:]...), validations) +
+			Arrangements(append([]rune{'#'}, history[1:]...), validations)
+		cache[ck] = res
+		return res
 	}
 
-	return res
-}
-
-func HasConsecutiveExactly(s string, n int) bool {
-	count := 0
-	for _, r := range s {
-		if r == '.' {
-			if count == n {
-				return true
-			}
-			if count > 0 {
-				return false
-			}
-		} else {
-			count++
+	if history[0] == '#' {
+		if len(validations) == 0 {
+			cache[ck] = 0
+			return 0
 		}
+		if len(history) < validations[0] {
+			cache[ck] = 0
+			return 0
+		}
+		if slices.Contains(history[:validations[0]], '.') {
+			cache[ck] = 0
+			return 0
+		}
+		if len(validations) > 1 {
+			if len(history) < validations[0]+1 || history[validations[0]] == '#' {
+				cache[ck] = 0
+				return 0
+			}
+			res := Arrangements(history[validations[0]+1:], validations[1:])
+			cache[ck] = res
+			return res
+		}
+		res := Arrangements(history[validations[0]:], validations[1:])
+		cache[ck] = res
+		return res
 	}
 
-	return count == n
+	panic("should not be possible")
 }
 
 func parseEntry(line string) Entry {
 	elms := strings.Split(line, " ")
-	return Entry{elms[0], lib.ParseNumbers(strings.ReplaceAll(elms[1], ",", " "))}
+
+	mut := 5
+	return Entry{
+		unfoldHistory(elms[0], mut),
+		unfoldValidations(lib.ParseNumbers(strings.ReplaceAll(elms[1], ",", " ")), mut),
+	}
 }
 
-func TotalArrangementsFromFile(filepath string) int {
+func unfoldHistory(history string, times int) string {
+	nhistory := history
+	for i := 0; i < times-1; i++ {
+		nhistory = fmt.Sprint(nhistory, "?", history)
+	}
+	return nhistory
+}
+
+func unfoldValidations(validations []int, times int) []int {
+	nvalidations := validations
+	for i := 0; i < times-1; i++ {
+		nvalidations = append(nvalidations, validations...)
+	}
+	return nvalidations
+}
+
+func TotalArrangementsFromFile(filepath string) uint64 {
 	file, err := os.Open(filepath)
 	if err != nil {
 		log.Fatal(err)
@@ -152,13 +116,14 @@ func TotalArrangementsFromFile(filepath string) int {
 
 	scanner := bufio.NewScanner(file)
 
-	total := 0
+	ln := 0
+	var total uint64 = 0
 	for scanner.Scan() {
+		log.Println("line", ln)
 		line := scanner.Text()
 		entry := parseEntry(line)
-		generated := GenerateFrom(entry)
-		fmt.Println(generated)
-		total += len(generated)
+		total += Arrangements([]rune(entry.history), entry.validation)
+		ln++
 	}
 
 	if err := scanner.Err(); err != nil {
