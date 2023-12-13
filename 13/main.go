@@ -21,9 +21,7 @@ func (p Pattern) String() string {
 }
 
 func (p Pattern) Rows() []string {
-	rows := make([]string, len(p))
-	copy(rows, p)
-	return rows
+	return p
 }
 
 func (p Pattern) Cols() []string {
@@ -59,29 +57,57 @@ func prefixReversed(a string, b string) bool {
 	return strings.HasPrefix(string(br), a)
 }
 
-func processPattern(pattern Pattern) int {
-	fmt.Println("new pattern")
-
-	for {
-		count := 0
-		colmirror := mirrorForDimension(pattern.Rows())
-		fmt.Println("colmirror", colmirror)
-		if colmirror >= 0 {
-			count += colmirror
-		}
-		rowmirror := mirrorForDimension(pattern.Cols())
-		fmt.Println("rowmirror", rowmirror)
-		if rowmirror >= 0 {
-			count += 100 * rowmirror
-		}
-
-		if count > 0 {
-			return count
-		}
-	}
+func replaceAtIndex(in string, r rune, i int) string {
+	out := []rune(in)
+	out[i] = r
+	return string(out)
 }
 
-func mirrorForDimension(rows []string) int {
+func generateSmudges(p Pattern) <-chan Pattern {
+	smudges := make(chan Pattern)
+	go func() {
+		defer close(smudges)
+
+		for i := 0; i < len(p); i++ {
+			for j := 0; j < len(p[0]); j++ {
+				np := make(Pattern, len(p))
+				copy(np, p)
+				if np[i][j] == '.' {
+					np[i] = replaceAtIndex(np[i], '#', j)
+				} else {
+					np[i] = replaceAtIndex(np[i], '.', j)
+				}
+				smudges <- np
+			}
+		}
+	}()
+	return smudges
+}
+
+func processPattern(pattern Pattern) (int, int) {
+	colmirror := mirrorForDimension(pattern.Rows(), -1)
+	rowmirror := mirrorForDimension(pattern.Cols(), -1)
+	return colmirror, rowmirror
+}
+
+func processSmudges(pattern Pattern) int {
+	orig_col, orig_row := processPattern(pattern)
+
+	for smudge := range generateSmudges(pattern) {
+		colmirror := mirrorForDimension(smudge.Rows(), orig_col)
+		if colmirror > 0 {
+			return colmirror
+		}
+		rowmirror := mirrorForDimension(smudge.Cols(), orig_row)
+		if rowmirror > 0 {
+			return 100 * rowmirror
+		}
+	}
+	fmt.Println(pattern)
+	panic("no new mirror after smudge")
+}
+
+func mirrorForDimension(rows []string, exclude int) int {
 	// index -> how many times
 	counts := make(map[int]int)
 	for _, row := range rows {
@@ -96,6 +122,9 @@ func mirrorForDimension(rows []string) int {
 	}
 
 	for idx, count := range counts {
+		if idx == exclude {
+			continue
+		}
 		if count == len(rows) {
 			return idx
 		}
@@ -119,18 +148,19 @@ func processPatterns(filepath string) int {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if len(line) == 0 {
+			fmt.Println("pattern", i)
 			if len(pattern) > 0 {
-				total += processPattern(pattern)
+				total += processSmudges(pattern)
 			}
+			i++
 			pattern = make([]string, 0)
 		} else {
 			pattern = append(pattern, line)
 		}
-		i++
 	}
 
 	if len(pattern) > 0 {
-		total += processPattern(pattern)
+		total += processSmudges(pattern)
 	}
 
 	if err := scanner.Err(); err != nil {
