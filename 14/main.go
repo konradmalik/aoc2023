@@ -53,13 +53,12 @@ func (p Dish) Cols() []string {
 	return cols
 }
 
-// assume rocks alwys roll down
-func (p Dish) Load() int {
+func (p Dish) NorthLoad() int {
 	load := 0
 	for i, row := range p.Rows() {
 		for _, cell := range row {
 			if cell == 'O' {
-				load += i + 1
+				load += len(p) - i
 			}
 		}
 	}
@@ -75,10 +74,56 @@ func (p Dish) RollNorth() Dish {
 			cs[i] = string(row)
 		}
 		return cs
-	})
+	},
+		func(s []string) Dish {
+			for i := range s {
+				row := []rune(s[i])
+				slices.Reverse(row)
+				s[i] = string(row)
+			}
+			return NewDishFromCols(s)
+		})
 }
 
-func (p Dish) rollToSide(getCols func(Dish) []string) Dish {
+func (p Dish) RollWest() Dish {
+	return p.rollToSide(func(d Dish) []string {
+		cs := d.Rows()
+		for i := range cs {
+			row := []rune(cs[i])
+			slices.Reverse(row)
+			cs[i] = string(row)
+		}
+		return cs
+	},
+		func(s []string) Dish {
+			for i := range s {
+				row := []rune(s[i])
+				slices.Reverse(row)
+				s[i] = string(row)
+			}
+			return NewDishFromRows(s)
+		})
+}
+
+func (p Dish) RollSouth() Dish {
+	return p.rollToSide(func(d Dish) []string {
+		return p.Cols()
+	},
+		func(s []string) Dish {
+			return NewDishFromCols(s)
+		})
+}
+
+func (p Dish) RollEast() Dish {
+	return p.rollToSide(func(d Dish) []string {
+		return p.Rows()
+	},
+		func(s []string) Dish {
+			return NewDishFromRows(s)
+		})
+}
+
+func (p Dish) rollToSide(getCols func(Dish) []string, getDish func([]string) Dish) Dish {
 	cols := getCols(p)
 
 	for i, col := range cols {
@@ -98,7 +143,7 @@ func (p Dish) rollToSide(getCols func(Dish) []string) Dish {
 		}
 	}
 
-	return NewDishFromCols(cols)
+	return getDish(cols)
 }
 
 func roll(row []rune, srci int) ([]rune, bool) {
@@ -146,10 +191,62 @@ func parseDish(filepath string) Dish {
 	return dish
 }
 
+// assumes that seq contains only that pattern
+func guessRepeatingPatternLength(seq []int) int {
+	maxLen := len(seq) / 2
+	for i := 2; i < maxLen; i++ {
+		if slices.Compare(seq[:i], seq[i:i*2]) == 0 {
+			return i
+		}
+	}
+	return maxLen
+}
+
+func guessRepeatingPatternStartIdx(seq []int) int {
+	// mark true where repeats
+	tracker := make([]bool, len(seq))
+	for i, v := range seq {
+		if past := slices.Index(seq[:i], v); past != -1 {
+			tracker[i] = true
+		} else {
+			tracker[i] = false
+		}
+	}
+
+	// reverse to find last idx where false
+	slices.Reverse(tracker)
+	revIdx := slices.Index(tracker, false)
+	return len(seq) - revIdx
+}
+
+func cycles(dish Dish, count int) []int {
+	loads := make([]int, count)
+	i := 1
+	for i <= count {
+		dish = dish.RollNorth()
+		dish = dish.RollWest()
+		dish = dish.RollSouth()
+		dish = dish.RollEast()
+		load := dish.NorthLoad()
+		log.Println("cycle", i, "load", load)
+		loads[i-1] = load
+		i++
+	}
+
+	return loads
+}
+
 func main() {
 	dish := parseDish("./input.txt")
 	fmt.Println(dish)
-	dish = dish.RollNorth()
-	fmt.Println(dish)
-	fmt.Println(dish.Load())
+	loads := cycles(dish, 200)
+	cycleStart := guessRepeatingPatternStartIdx(loads)
+	fmt.Println("cycle starts at", cycleStart)
+	repeatingLoads := loads[cycleStart:]
+	fmt.Println("repeatingLoads", repeatingLoads)
+	cycleLen := guessRepeatingPatternLength(repeatingLoads)
+	fmt.Println("cycle length is", cycleLen)
+	resultIdx := ((1000000000 - cycleStart) % cycleLen) - 1
+	fmt.Println("answer index is", resultIdx)
+	fmt.Println("the answer", repeatingLoads[resultIdx])
 }
