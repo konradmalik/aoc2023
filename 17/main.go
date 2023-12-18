@@ -157,7 +157,7 @@ func (g grid) toGraph() Graph {
 				cnode := Node{x: x, y: y, d: d}
 				nodes = append(nodes, cnode)
 
-				cedges := g.GetEdges(cnode, 1, 3)
+				cedges := g.GetEdges(cnode, 4, 10)
 				for _, edge := range cedges {
 					n := edge.source
 					saved, found := nodeToEdges[n]
