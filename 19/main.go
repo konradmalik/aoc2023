@@ -107,6 +107,52 @@ func NewPart(s string) Part {
 	return p
 }
 
+type PartRange struct {
+	min int
+	max int
+}
+
+func partRangesProduct(ranges []PartRange) int {
+	result := 1
+	for _, r := range ranges {
+		result *= r.max - r.min + 1
+	}
+	return result
+}
+
+func ProcessPartRanges(ws map[string]Workflow, wn string, ranges []PartRange) int {
+	fieldToIdx := map[string]int{"x": 0, "m": 1, "a": 2, "s": 3}
+
+	if wn == "A" {
+		return partRangesProduct(ranges)
+	} else if wn == "R" {
+		return 0
+	}
+
+	combinations := 0
+	w := ws[wn]
+	for _, r := range w.rules {
+		idx := fieldToIdx[r.field]
+		newRanges := make([]PartRange, len(ranges))
+		copy(newRanges, ranges[:])
+
+		switch r.op {
+		case "":
+			combinations += ProcessPartRanges(ws, r.then, ranges)
+		case ">":
+			newRanges[idx].min = r.value + 1
+			ranges[idx].max = r.value
+			combinations += ProcessPartRanges(ws, r.then, newRanges)
+		case "<":
+			newRanges[idx].max = r.value - 1
+			ranges[idx].min = r.value
+			combinations += ProcessPartRanges(ws, r.then, newRanges)
+		}
+	}
+
+	return combinations
+}
+
 func parseFile(filepath string) (map[string]Workflow, []Part) {
 	file, err := os.Open(filepath)
 	if err != nil {
@@ -159,4 +205,7 @@ func main() {
 		}
 	}
 	fmt.Println(sum)
+
+	ranges := []PartRange{{1, 4000}, {1, 4000}, {1, 4000}, {1, 4000}}
+	fmt.Println(ProcessPartRanges(workflows, "in", ranges))
 }
