@@ -17,12 +17,28 @@ type Entry struct {
 
 func NewEntry(s string) Entry {
 	ss := strings.Split(s, " ")
-	count, err := strconv.Atoi(ss[1])
+	hex := strings.ReplaceAll(ss[2], "(", "")
+	hex = strings.ReplaceAll(hex, ")", "")
+	hex = hex[1:]
+	count := hex[:len(hex)-1]
+	d := rune(hex[len(hex)-1])
+	var dir string
+	if d == '0' {
+		dir = "R"
+	} else if d == '1' {
+		dir = "D"
+	} else if d == '2' {
+		dir = "L"
+	} else {
+		dir = "U"
+	}
+
+	n, err := strconv.ParseInt(count, 16, 64)
+	fmt.Println(n)
 	if err != nil {
 		panic(err)
 	}
-
-	return Entry{ss[0], count}
+	return Entry{dir, int(n)}
 }
 
 type Point struct {
