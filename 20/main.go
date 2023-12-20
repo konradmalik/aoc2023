@@ -22,6 +22,8 @@ type Signal struct {
 	source string
 	target string
 	kind   SignalType
+	// increases every button push
+	counter int
 }
 
 func (s Signal) String() string {
@@ -36,8 +38,8 @@ func (s Signal) String() string {
 	return fmt.Sprintf("%s -%s-> %s", s.source, kind, s.target)
 }
 
-func NewSignal(source, target string, kind SignalType) Signal {
-	return Signal{source: source, target: target, kind: kind}
+func NewSignal(source, target string, kind SignalType, counter int) Signal {
+	return Signal{source: source, target: target, kind: kind, counter: counter}
 }
 
 type Module interface {
@@ -54,7 +56,7 @@ type Broadcaster struct {
 func (b Broadcaster) Process(s Signal) []Signal {
 	signals := make([]Signal, len(b.targets))
 	for i, t := range b.targets {
-		signals[i] = NewSignal(b.name, t, s.kind)
+		signals[i] = NewSignal(b.name, t, s.kind, s.counter)
 	}
 	return signals
 }
@@ -99,9 +101,9 @@ func (f *FlipFlop) Process(s Signal) []Signal {
 		signals := make([]Signal, len(f.targets))
 		for i, t := range f.targets {
 			if !wasOn {
-				signals[i] = NewSignal(f.name, t, HIGH)
+				signals[i] = NewSignal(f.name, t, HIGH, s.counter)
 			} else {
-				signals[i] = NewSignal(f.name, t, LOW)
+				signals[i] = NewSignal(f.name, t, LOW, s.counter)
 			}
 		}
 		return signals
@@ -115,10 +117,11 @@ type Conjunction struct {
 	prevs     map[string]SignalType
 	targets   []string
 	numInputs int
+	firstHigh int
 }
 
 func NewConjunction(name string, targets []string, numInputs int) *Conjunction {
-	return &Conjunction{name: name, prevs: make(map[string]SignalType), targets: targets, numInputs: numInputs}
+	return &Conjunction{name: name, prevs: make(map[string]SignalType), targets: targets, numInputs: numInputs, firstHigh: -1}
 }
 
 func (c Conjunction) Targets() []string {
@@ -149,9 +152,12 @@ func (c *Conjunction) Process(s Signal) []Signal {
 		c.prevs[s.source] = s.kind
 
 		if c.AllHigh() {
-			signals[i] = NewSignal(c.name, t, LOW)
+			signals[i] = NewSignal(c.name, t, LOW, s.counter)
 		} else {
-			signals[i] = NewSignal(c.name, t, HIGH)
+			signals[i] = NewSignal(c.name, t, HIGH, s.counter)
+			if c.firstHigh < 0 {
+				c.firstHigh = s.counter
+			}
 		}
 	}
 	return signals
@@ -180,14 +186,18 @@ type Configuration struct {
 	highs   int
 }
 
-func (c *Configuration) OneCycle() {
+func (c *Configuration) OneCycle(i int) bool {
 	signals := lib.NewQueue[Signal]()
-	signals.Enqueue(NewSignal("button", "broadcaster", LOW))
+	signals.Enqueue(NewSignal("button", "broadcaster", LOW, i))
 
 	for !signals.IsEmpty() {
 		s := signals.Dequeue()
 		switch s.kind {
 		case LOW:
+			// finish early if rx
+			if s.target == "rx" {
+				return true
+			}
 			c.lows++
 		case HIGH:
 			c.highs++
@@ -197,6 +207,8 @@ func (c *Configuration) OneCycle() {
 			signals.Enqueue(ns)
 		}
 	}
+
+	return false
 }
 
 func (c Configuration) Process(s Signal) []Signal {
@@ -247,14 +259,67 @@ func NewConfiguration(filepath string) Configuration {
 	return c
 }
 
-func main() {
-	c := NewConfiguration("./input.txt")
-	pushes := 1000
-	for i := 0; i < pushes; i++ {
-		c.OneCycle()
+// greatest common divisor (GCD) via Euclidean algorithm
+func GCD(a, b int) int {
+	for b != 0 {
+		t := b
+		b = a % b
+		a = t
+	}
+	return a
+}
+
+// find Least Common Multiple (LCM) via GCD
+func LCM(a, b int, integers ...int) int {
+	result := a * b / GCD(a, b)
+
+	for i := 0; i < len(integers); i++ {
+		result = LCM(result, integers[i])
 	}
 
-	fmt.Println("lows", c.lows)
-	fmt.Println("highs", c.highs)
-	fmt.Println("mult", c.lows*c.highs)
+	return result
+}
+
+func main() {
+	c := NewConfiguration("./input.txt")
+
+	// NOTE: We are being asked to figure out when a single low pulse is
+	// sent to "rx". Certain things are true about the input data that
+	// make this easier to figure out without brute force:
+	// 1. The only input to "rx" is a single conjunction module (in my
+	// case, "ft").
+	// 2. The only input to each input to "ft" is also a single
+	// conjunction module. (vz, bq, qh, lt)
+	// 3. Each input to "ft" only sends a high pulse periodically (and
+	// sends a low pulse at all other times).
+	// This means that the correct number of button presses is the LCM
+	// (lowest common multiple) of the period lengths for each input to
+	// "ft".
+
+	modules := make([]*Conjunction, 0)
+	for _, m := range []string{"vz", "bq", "qh", "lt"} {
+		modules = append(modules, c.modules[m].(*Conjunction))
+	}
+
+	// press until all fired
+	i := 0
+main:
+	for {
+		i++
+		c.OneCycle(i)
+		for _, m := range modules {
+			if m.firstHigh < 0 {
+				continue main
+			}
+		}
+		break
+	}
+
+	nums := make([]int, 0)
+	for _, m := range modules {
+		nums = append(nums, m.firstHigh)
+		fmt.Println(m.name, m.firstHigh)
+	}
+
+	fmt.Println("LCM", LCM(nums[0], nums[1], nums[2:]...))
 }
